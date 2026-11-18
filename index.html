@@ -192,6 +192,109 @@ petardEvent.OnServerEvent:Connect(function(player, action)
 end)</pre>
     </div>
 
+    <div class="card">
+        <div class="header">
+            <h3>4. Автоматика поезда (Waypoints и плавное торможение)</h3>
+            <button onclick="copyCode('c4', this)">Копировать</button>
+        </div>
+        <div class="path">Куда: Внутрь модели поезда (обычный Script)</div>
+        <pre id="c4">local RunService = game:GetService("RunService")
+
+local train = script.Parent
+local root = train.PrimaryPart
+local waypointsFolder = workspace:WaitForChild("Waypoints")
+
+local MAX_SPEED = 45
+local ACCELERATION = 10
+local DECELERATION = 12
+local BRAKE_DISTANCE = 60
+
+local currentSpeed = 0
+local currentIndex = 1
+
+local waypoints = {}
+for _, point in ipairs(waypointsFolder:GetChildren()) do
+	local num = tonumber(point.Name)
+	if num then
+		waypoints[num] = point
+	end
+end
+
+if waypoints[1] then
+	train:PivotTo(waypoints[1].CFrame)
+end
+
+local function getDistanceToNextStation(startIndex, currentPos)
+	local totalDist = 0
+	local prevPos = currentPos
+
+	for i = startIndex, #waypoints do
+		local wp = waypoints[i]
+		totalDist += (wp.Position - prevPos).Magnitude
+		prevPos = wp.Position
+
+		local waitObj = wp:FindFirstChild("WaitTime")
+		if waitObj and waitObj.Value > 0 then
+			return totalDist
+		end
+	end
+
+	return math.huge
+end
+
+task.spawn(function()
+	while true do
+		local nextIndex = currentIndex + 1
+		if nextIndex > #waypoints then
+			nextIndex = 1
+		end
+
+		local targetPoint = waypoints[nextIndex]
+		if not targetPoint then break end
+
+		while true do
+			local dt = RunService.Heartbeat:Wait()
+			local currentPos = root.Position
+			local targetPos = targetPoint.Position
+			local vectorToTarget = targetPos - currentPos
+			local distToPoint = vectorToTarget.Magnitude
+
+			local distToStation = getDistanceToNextStation(nextIndex, currentPos)
+			local targetSpeed = MAX_SPEED
+
+			if distToStation <= BRAKE_DISTANCE then
+				targetSpeed = math.max(4, MAX_SPEED * (distToStation / BRAKE_DISTANCE))
+			end
+
+			if currentSpeed < targetSpeed then
+				currentSpeed = math.min(targetSpeed, currentSpeed + ACCELERATION * dt)
+			elseif currentSpeed > targetSpeed then
+				currentSpeed = math.max(targetSpeed, currentSpeed - DECELERATION * dt)
+			end
+
+			local step = currentSpeed * dt
+
+			if distToPoint <= step then
+				train:PivotTo(CFrame.lookAt(targetPos, targetPos + vectorToTarget.Unit))
+				currentIndex = nextIndex
+				break
+			else
+				local direction = vectorToTarget.Unit
+				local newPos = currentPos + direction * step
+				local targetCFrame = CFrame.lookAt(newPos, newPos + direction)
+				train:PivotTo(root.CFrame:Lerp(targetCFrame, 0.15))
+			end
+		end
+
+		local waitObj = targetPoint:FindFirstChild("WaitTime")
+		if waitObj and waitObj.Value > 0 then
+			currentSpeed = 0
+			task.wait(waitObj.Value)
+		end
+	end
+end)</pre>
+    </div>
+
     <script>
         function copyCode(id, btn) {
             const text = document.getElementById(id).innerText;
@@ -205,11 +308,10 @@ end)</pre>
         function filterScripts() {
             const query = document.getElementById("searchInput").value.toLowerCase();
             const cards = document.getElementsByClassName("card");
-            for (let card of cards) {
-                const title = card.querySelector("h3").innerText.toLowerCase();
-                card.style.display = title.includes(query) ? "block" : "none";
-            }
-        }
+            for (let card of cards) { const title = card.querySelector("h3").innerText.toLowerCase();
+card.style.display = title.includes(query) ? "block" : "none";
+}
+		}        }
     </script>
 
 </body>
