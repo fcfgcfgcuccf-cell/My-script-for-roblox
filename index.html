@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои скрипты Roblox Studio</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #121212; color: #e0e0e0; max-width: 800px; margin: 20px auto; padding: 0 15px; }
+        h1 { color: #00a2ff; font-size: 22px; text-align: center; }
+        .search { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #333; background: #1e1e1e; color: white; font-size: 16px; box-sizing: border-box; }
+        .card { background: #1e1e1e; border-radius: 10px; padding: 15px; margin-bottom: 18px; border: 1px solid #333; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+        h3 { margin: 0; font-size: 16px; color: #fff; }
+        .path { font-size: 12px; color: #888; margin-bottom: 10px; }
+        button { background: #00a2ff; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        button:active { background: #0077bd; }
+        pre { background: #141414; padding: 12px; border-radius: 6px; overflow-x: auto; color: #a9dc76; font-size: 13px; margin: 0; }
+    </style>
+</head>
+<body>
+
+    <h1>Мои скрипты Roblox</h1>
+    <input type="text" class="search" id="searchInput" onkeyup="filterScripts()" placeholder="Поиск по названию...">
+
+    <div class="card">
+        <div class="header">
+            <h3>1. Вид от 1-го лица (тело + аксессуары)</h3>
+            <button onclick="copyCode('c1', this)">Копировать</button>
+        </div>
+        <div class="path">Куда: StarterPlayer -> StarterCharacterScripts (LocalScript)</div>
+        <pre id="c1">local runService = game:GetService("RunService")
+local character = script.Parent
+local humanoid = character:WaitForChild("Humanoid")
+
+humanoid.CameraOffset = Vector3.new(0, 0.2, -0.8)
+
+runService.RenderStepped:Connect(function()
+	for _, item in ipairs(character:GetDescendants()) do
+		if item:IsA("BasePart") and item.Name ~= "Head" then
+			item.LocalTransparencyModifier = 0
+		end
+	end
+end)</pre>
+    </div>
+
+    <div class="card">
+        <div class="header">
+            <h3>2. Корсар 1: Анимация и зажигалка</h3>
+            <button onclick="copyCode('c2', this)">Копировать</button>
+        </div>
+        <div class="path">Куда: Внутрь Tool (LocalScript)</div>
+        <pre id="c2">local tool = script.Parent
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local petardEvent = replicatedStorage:WaitForChild("PetardEvent")
+
+local lightAnim = Instance.new("Animation")
+lightAnim.AnimationId = "rbxassetid://ВАШ_ID_АНИМАЦИИ"
+
+local state = 0
+
+tool.Activated:Connect(function()
+	local character = tool.Parent
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	if state == 0 then
+		state = 1
+		petardEvent:FireServer("Light")
+
+		local animator = humanoid:FindFirstChildOfClass("Animator")
+		if animator then
+			local track = animator:LoadAnimation(lightAnim)
+			track.Priority = Enum.AnimationPriority.Action
+			track:Play()
+		end
+
+		local leftHand = character:FindFirstChild("LeftHand") or character:FindFirstChild("Left Arm")
+		local lighterTemplate = replicatedStorage:FindFirstChild("Lighter")
+		if leftHand and lighterTemplate then
+			local lighter = lighterTemplate:Clone()
+			lighter.CanCollide = false
+			lighter.Massless = true
+			lighter.CFrame = leftHand.CFrame
+			lighter.Parent = character
+
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = leftHand
+			weld.Part1 = lighter
+			weld.Parent = lighter
+
+			task.delay(1, function()
+				if lighter then lighter:Destroy() end
+			end)
+		end
+
+	elseif state == 1 then
+		state = 2
+		petardEvent:FireServer("Throw")
+	end
+end)</pre>
+    </div>
+
+    <div class="card">
+        <div class="header">
+            <h3>3. Корсар 1: Взрыв, звук и урон</h3>
+            <button onclick="copyCode('c3', this)">Копировать</button>
+        </div>
+        <div class="path">Куда: Внутрь Tool (обычный Script)</div>
+        <pre id="c3">local tool = script.Parent
+local handle = tool:WaitForChild("Handle")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local debris = game:GetService("Debris")
+local petardEvent = replicatedStorage:WaitForChild("PetardEvent")
+
+local fuseTime = 4
+local blastRadius = 18
+local damageRadius = 5
+local maxDamage = 10
+local throwForce = 55
+
+local isLit = false
+local isThrown = false
+
+local function detonate()
+	if not tool or not tool.Parent then return end
+	local explosionPos = handle.Position
+
+	local soundPart = Instance.new("Part")
+	soundPart.Transparency = 1
+	soundPart.Anchored = true
+	soundPart.CanCollide = false
+	soundPart.Position = explosionPos
+	soundPart.Parent = workspace
+
+	local expSoundTemplate = handle:FindFirstChild("ExplosionSound")
+	if expSoundTemplate then
+		local sound = expSoundTemplate:Clone()
+		sound.Parent = soundPart
+		sound:Play()
+	end
+	debris:AddItem(soundPart, 3)
+
+	local explosion = Instance.new("Explosion")
+	explosion.Position = explosionPos
+	explosion.BlastRadius = blastRadius
+	explosion.BlastPressure = 2000
+	explosion.DestroyJointRadiusPercent = 0
+	explosion.Parent = workspace
+
+	for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+
+		if hum and root then
+			local distance = (root.Position - explosionPos).Magnitude
+			if distance <= damageRadius then
+				local damage = math.ceil(maxDamage * (1 - (distance / damageRadius)))
+				hum:TakeDamage(damage)
+			end
+		end
+	end
+
+	tool:Destroy()
+end
+
+petardEvent.OnServerEvent:Connect(function(player, action)
+	if tool.Parent ~= player.Character then return end
+
+	if action == "Light" and not isLit then
+		isLit = true
+		local sparks = handle:FindFirstChild("Sparks")
+		if sparks then sparks.Enabled = true end
+
+		local fuseSound = handle:FindFirstChild("FuseSound")
+		if fuseSound then fuseSound:Play() end
+
+		task.delay(fuseTime, detonate)
+
+	elseif action == "Throw" and isLit and not isThrown then
+		isThrown = true
+		local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+
+		tool.Parent = workspace
+		handle.CanCollide = true
+
+		if rootPart then
+			local lookVector = rootPart.CFrame.LookVector
+			handle.AssemblyLinearVelocity = (lookVector * throwForce) + Vector3.new(0, 15, 0)
+		end
+	end
+end)</pre>
+    </div>
+
+    <script>
+        function copyCode(id, btn) {
+            const text = document.getElementById(id).innerText;
+            navigator.clipboard.writeText(text);
+            const oldText = btn.innerText;
+            btn.innerText = "Готово!";
+            btn.style.background = "#28a745";
+            setTimeout(() => { btn.innerText = oldText; btn.style.background = "#00a2ff"; }, 1500);
+        }
+
+        function filterScripts() {
+            const query = document.getElementById("searchInput").value.toLowerCase();
+            const cards = document.getElementsByClassName("card");
+            for (let card of cards) {
+                const title = card.querySelector("h3").innerText.toLowerCase();
+                card.style.display = title.includes(query) ? "block" : "none";
+            }
+        }
+    </script>
+
+</body>
+</html>
